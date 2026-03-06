@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Budget | Token Calculator for AI Coding</title>
+  <meta name="description" content="Estimate token counts and context window usage for AI coding assistants like Claude, GPT-4, and Gemini.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-dim: #1f6feb;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --purple: #a371f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 400px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Monaco', monospace;
+      font-size: 0.875rem;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+
+    textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .stats-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-detail {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .models-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .model-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .model-row:first-child {
+      padding-top: 0;
+    }
+
+    .model-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .model-anthropic { background: #cc785c; color: white; }
+    .model-openai { background: #10a37f; color: white; }
+    .model-google { background: #4285f4; color: white; }
+    .model-meta { background: #0668E1; color: white; }
+    .model-mistral { background: #ff7000; color: white; }
+
+    .model-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .model-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .model-context {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .model-bar-container {
+      width: 100px;
+      height: 6px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .model-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease, background 0.3s ease;
+    }
+
+    .model-percent {
+      width: 50px;
+      text-align: right;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tips-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .tip {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      padding: 0.5rem 0;
+    }
+
+    .tip-icon {
+      flex-shrink: 0;
+    }
+
+    .tip-text {
+      color: var(--text-muted);
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--border);
+      border-color: var(--text-muted);
+    }
+
+    .btn-primary {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Breakdown table */
+    .breakdown-table {
+      width: 100%;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .breakdown-row:last-child {
+      border-bottom: none;
+    }
+
+    .breakdown-label {
+      color: var(--text-muted);
+    }
+
+    .breakdown-value {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 Context Budget</h1>
+      <p class="subtitle">Estimate tokens and plan your AI prompts</p>
+    </header>
+
+    <div class="main-grid">
+      <div class="input-section">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Your Content</span>
+            <div class="quick-actions">
+              <button class="btn" onclick="loadSample('code')">Sample Code</button>
+              <button class="btn" onclick="loadSample('prompt')">Sample Prompt</button>
+              <button class="btn" onclick="clearInput()">Clear</button>
+            </div>
+          </div>
+          <textarea 
+            id="input" 
+            placeholder="Paste your code, prompt, or context here...
+
+Supports:
+• Code snippets (any language)
+• System prompts
+• Documentation
+• Entire files
+
+Token estimation uses GPT-4/Claude tokenization approximation (~4 chars per token for code, adjusted for language patterns)."
+            oninput="analyze()"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-label">Estimated Tokens</div>
+          <div class="stat-value" id="tokenCount">0</div>
+          <div class="stat-detail" id="tokenDetail">Paste content to analyze</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Content Breakdown</div>
+          <div class="breakdown-table">
+            <div class="breakdown-row">
+              <span class="breakdown-label">Characters</span>
+              <span class="breakdown-value" id="charCount">0</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Words</span>
+              <span class="breakdown-value" id="wordCount">0</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Lines</span>
+              <span class="breakdown-value" id="lineCount">0</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Code blocks</span>
+              <span class="breakdown-value" id="codeBlocks">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="models-card">
+          <div class="card-title" style="margin-bottom: 0.75rem;">Context Window Usage</div>
+          <div id="modelList"></div>
+        </div>
+
+        <div class="tips-card">
+          <div class="card-title" style="margin-bottom: 0.5rem;">Tips</div>
+          <div class="tip">
+            <span class="tip-icon">💡</span>
+            <span class="tip-text" id="tip">Add content to see context-aware tips</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Built for developers working with AI coding assistants<br>
+      <a href="https://entazis.dev">entazis.dev</a>
+    </footer>
+  </div>
+
+  <script>
+    const models = [
+      { name: 'Claude Opus 4.5', context: 200000, icon: 'C', class: 'model-anthropic' },
+      { name: 'Claude Sonnet 4.5', context: 200000, icon: 'C', class: 'model-anthropic' },
+      { name: 'GPT-4o', context: 128000, icon: 'G', class: 'model-openai' },
+      { name: 'GPT-4 Turbo', context: 128000, icon: 'G', class: 'model-openai' },
+      { name: 'Gemini 2.0 Pro', context: 1000000, icon: 'G', class: 'model-google' },
+      { name: 'Llama 3.3 70B', context: 128000, icon: 'L', class: 'model-meta' },
+      { name: 'Mistral Large', context: 128000, icon: 'M', class: 'model-mistral' },
+    ];
+
+    const tips = [
+      { condition: tokens => tokens === 0, text: 'Paste code, prompts, or documentation to analyze token usage' },
+      { condition: tokens => tokens < 1000, text: 'Small context — plenty of room for model responses and conversation' },
+      { condition: tokens => tokens < 5000, text: 'Moderate context — good for most coding tasks with room for discussion' },
+      { condition: tokens => tokens < 20000, text: 'Substantial context — consider breaking into focused chunks for complex tasks' },
+      { condition: tokens => tokens < 50000, text: 'Large context — works well with Claude. Consider summarizing less relevant sections' },
+      { condition: tokens => tokens < 100000, text: 'Very large context — prioritize essential code. Use tree-sitter summaries where possible' },
+      { condition: tokens => tokens >= 100000, text: 'Massive context — consider using search/retrieval rather than including everything' },
+    ];
+
+    const samples = {
+      code: `// Example: NestJS Controller with TypeScript
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { User } from './entities/user.entity';
+
+@ApiTags('users')
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new user' })
+  async create(@Body() createUserDto: CreateUserDto): Promise<User> {
+    return this.usersService.create(createUserDto);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all users' })
+  async findAll(): Promise<User[]> {
+    return this.usersService.findAll();
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user by ID' })
+  async findOne(@Param('id') id: string): Promise<User> {
+    return this.usersService.findOne(id);
+  }
+}`,
+      prompt: `You are an expert TypeScript/NestJS developer helping me refactor a microservices architecture.
+
+## Context
+I'm working on a v3.0 architecture rewrite with these goals:
+- Improve permission system granularity
+- Better schema lifecycle management
+- Clear service boundaries
+
+## Current Issue
+The user service is tightly coupled to the auth service. When a user is created, we need to:
+1. Create the user record
+2. Send verification email
+3. Create default permissions
+4. Sync to external CRM
+
+Currently this is all synchronous in one transaction. I want to decouple using events.
+
+## Constraints
+- Must maintain data consistency
+- Need exactly-once processing for critical operations
+- Using Redis for pub/sub and PostgreSQL for persistence
+- MQTT available for real-time updates
+
+## Questions
+1. Should I use Redis Streams or a dedicated message queue?
+2. How to handle the "verification email" side effect?
+3. Best pattern for saga/choreography here?
+
+Please provide specific code examples using NestJS patterns.`
+    };
+
+    function estimateTokens(text) {
+      if (!text) return 0;
+      
+      // More sophisticated estimation
+      // Base: ~4 chars per token for English text
+      // Adjustments for code patterns
+      
+      let tokens = 0;
+      
+      // Split into code and prose sections
+      const codeBlockRegex = /```[\s\S]*?```|`[^`]+`/g;
+      const codeBlocks = text.match(codeBlockRegex) || [];
+      let proseText = text.replace(codeBlockRegex, ' ');
+      
+      // Code tokens (more dense - about 3.5 chars per token due to keywords, symbols)
+      for (const block of codeBlocks) {
+        tokens += Math.ceil(block.length / 3.5);
+      }
+      
+      // Prose tokens (about 4 chars per token)
+      tokens += Math.ceil(proseText.length / 4);
+      
+      // Adjust for whitespace (tokenizers often combine whitespace)
+      const whitespaceRatio = (text.match(/\s+/g) || []).length / Math.max(text.length, 1);
+      if (whitespaceRatio > 0.2) {
+        tokens = Math.ceil(tokens * 0.9);
+      }
+      
+      // Adjust for special characters in code (operators, brackets often separate tokens)
+      const specialChars = (text.match(/[{}()\[\]<>.,;:!@#$%^&*+=|\\/?-]/g) || []).length;
+      tokens += Math.ceil(specialChars * 0.3);
+      
+      return tokens;
+    }
+
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      }
+      if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toLocaleString();
+    }
+
+    function getBarColor(percent) {
+      if (percent < 25) return 'var(--green)';
+      if (percent < 50) return 'var(--accent)';
+      if (percent < 75) return 'var(--yellow)';
+      return 'var(--red)';
+    }
+
+    function analyze() {
+      const input = document.getElementById('input').value;
+      const tokens = estimateTokens(input);
+      
+      // Update token count
+      document.getElementById('tokenCount').textContent = formatNumber(tokens);
+      
+      // Token detail
+      const detail = tokens === 0 
+        ? 'Paste content to analyze'
+        : `~${(tokens * 4 / 1000).toFixed(1)}KB of context`;
+      document.getElementById('tokenDetail').textContent = detail;
+      
+      // Content breakdown
+      document.getElementById('charCount').textContent = input.length.toLocaleString();
+      document.getElementById('wordCount').textContent = (input.match(/\S+/g) || []).length.toLocaleString();
+      document.getElementById('lineCount').textContent = (input.split('\n').length).toLocaleString();
+      
+      const codeBlockCount = (input.match(/```/g) || []).length / 2;
+      document.getElementById('codeBlocks').textContent = Math.floor(codeBlockCount).toLocaleString();
+      
+      // Update model list
+      const modelHtml = models.map(model => {
+        const percent = tokens === 0 ? 0 : Math.min((tokens / model.context) * 100, 100);
+        const displayPercent = percent < 0.1 && tokens > 0 ? '<0.1' : percent.toFixed(1);
+        const barColor = getBarColor(percent);
+        
+        return `
+          <div class="model-row">
+            <div class="model-icon ${model.class}">${model.icon}</div>
+            <div class="model-info">
+              <div class="model-name">${model.name}</div>
+              <div class="model-context">${formatNumber(model.context)} tokens</div>
+            </div>
+            <div class="model-bar-container">
+              <div class="model-bar" style="width: ${percent}%; background: ${barColor}"></div>
+            </div>
+            <div class="model-percent" style="color: ${barColor}">${displayPercent}%</div>
+          </div>
+        `;
+      }).join('');
+      
+      document.getElementById('modelList').innerHTML = modelHtml;
+      
+      // Update tip
+      const tip = tips.find(t => t.condition(tokens));
+      document.getElementById('tip').textContent = tip ? tip.text : tips[tips.length - 1].text;
+      
+      // Track analysis event (only for substantial content)
+      if (tokens > 100 && !window.lastTrackedTokens || Math.abs(tokens - window.lastTrackedTokens) > 500) {
+        window.lastTrackedTokens = tokens;
+        trackEvent('analyze', tokens > 10000 ? 'large' : tokens > 1000 ? 'medium' : 'small');
+      }
+    }
+
+    function loadSample(type) {
+      document.getElementById('input').value = samples[type] || '';
+      analyze();
+      trackEvent('sample_' + type);
+    }
+
+    function clearInput() {
+      document.getElementById('input').value = '';
+      analyze();
+    }
+
+    function trackEvent(action, category = 'interaction') {
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metrics: [{
+            name: 'web_events',
+            type: 'counter',
+            value: 1,
+            labels: { site: 'context', action, category }
+          }]
+        })
+      }).catch(() => {});
+    }
+
+    // Initial render
+    analyze();
+
+    // Track page visit
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metrics: [{
+          name: 'web_page_visits',
+          type: 'counter',
+          value: 1,
+          labels: { site: 'context', page: location.pathname }
+        }]
+      })
+    }).catch(() => {});
+  </script>
+</body>
+</html>
